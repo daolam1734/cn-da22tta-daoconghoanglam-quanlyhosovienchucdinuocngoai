@@ -7,6 +7,8 @@ import RecordManagement from './pages/RecordManagement';
 import RoleManagement from './pages/RoleManagement';
 import UnitManagement from './pages/UnitManagement';
 import RegulationManagement from './pages/RegulationManagement';
+import SystemConfig from './pages/SystemConfig';
+import WorkflowManagement from './pages/WorkflowManagement';
 import Profile from './pages/Profile';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
@@ -31,6 +33,8 @@ const AppContent = () => {
       case 'roles': return <RoleManagement />;
       case 'units': return <UnitManagement />;
       case 'regulations': return <RegulationManagement />;
+      case 'system-config': return <SystemConfig />;
+      case 'workflows': return <WorkflowManagement />;
       case 'profile': return <Profile />;
       default: return <Dashboard />;
     }

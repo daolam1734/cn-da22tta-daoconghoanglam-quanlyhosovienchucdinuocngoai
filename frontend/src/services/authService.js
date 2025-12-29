@@ -27,9 +27,32 @@ const getCurrentUser = () => {
 
 const getToken = () => localStorage.getItem('token');
 
+const changePassword = async (oldPassword, newPassword) => {
+    const response = await fetch(`${API_URL}/change-password`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getToken()}`
+        },
+        body: JSON.stringify({ oldPassword, newPassword }),
+    });
+    return await response.json();
+};
+
+const forgotPassword = async (email) => {
+    const response = await fetch(`${API_URL}/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+    });
+    return await response.json();
+};
+
 export default {
     login,
     logout,
     getCurrentUser,
-    getToken
+    getToken,
+    changePassword,
+    forgotPassword
 };

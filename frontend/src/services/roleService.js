@@ -21,7 +21,29 @@ const createRole = async (roleData) => {
     return await response.json();
 };
 
+const updateRole = async (id, roleData) => {
+    const response = await fetch(`${API_URL}/${id}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authService.getToken()}`
+        },
+        body: JSON.stringify(roleData),
+    });
+    return await response.json();
+};
+
+const deleteRole = async (id) => {
+    const response = await fetch(`${API_URL}/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${authService.getToken()}` },
+    });
+    return await response.json();
+};
+
 export default {
     getRoles,
-    createRole
+    createRole,
+    updateRole,
+    deleteRole
 };

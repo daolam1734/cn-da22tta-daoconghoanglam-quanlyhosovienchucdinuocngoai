@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import recordService from '../services/recordService';
 import reportService from '../services/reportService';
+import regulationService from '../services/regulationService';
 import { useAuth } from '../contexts/AuthContext';
 import { 
     MdAdd, 
@@ -28,6 +29,8 @@ const RecordManagement = ({ mode = 'all' }) => {
     const [reportData, setReportData] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState(null);
+    const [tripTypes, setTripTypes] = useState([]);
+    const [countries, setCountries] = useState([]);
     const [processFiles, setProcessFiles] = useState([]);
     const [newReport, setNewReport] = useState({
         noi_dung_bao_cao: '',
@@ -48,14 +51,30 @@ const RecordManagement = ({ mode = 'all' }) => {
     const [files, setFiles] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
 
+    const todayStr = new Date().toISOString().split('T')[0];
+
     useEffect(() => {
         fetchRecords();
+        fetchMetadata();
     }, []);
+
+    const fetchMetadata = async () => {
+        try {
+            const [tripTypesRes, countriesRes] = await Promise.all([
+                regulationService.getTripTypes(),
+                regulationService.getCountries()
+            ]);
+            if (tripTypesRes.success) setTripTypes(tripTypesRes.data);
+            if (countriesRes.success) setCountries(countriesRes.data);
+        } catch (error) {
+            console.error('Error fetching metadata:', error);
+        }
+    };
 
     const resetForm = () => {
         setNewRecord({
-            ma_loai_chuyen_di: 'CONG_TAC',
-            ma_quoc_gia: 'VN',
+            ma_loai_chuyen_di: tripTypes.length > 0 ? tripTypes[0].ma_loai : 'CONG_TAC',
+            ma_quoc_gia: countries.length > 0 ? countries[0].ma_quoc_gia : 'VN',
             tu_ngay: '',
             den_ngay: '',
             dia_diem_cu_the: '',
@@ -90,6 +109,22 @@ const RecordManagement = ({ mode = 'all' }) => {
         // Basic validation
         if (!newRecord.tu_ngay || !newRecord.den_ngay || !newRecord.noi_dung_cong_viec) {
             alert('Vui lòng điền đầy đủ các thông tin bắt buộc (Từ ngày, Đến ngày, Nội dung)');
+            return;
+        }
+
+        // Date validation
+        const tuNgay = new Date(newRecord.tu_ngay);
+        const denNgay = new Date(newRecord.den_ngay);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (tuNgay < today && !isEditing) {
+            alert('Ngày bắt đầu không được nhỏ hơn ngày hiện tại');
+            return;
+        }
+
+        if (denNgay < tuNgay) {
+            alert('Ngày kết thúc không được nhỏ hơn ngày bắt đầu');
             return;
         }
 
@@ -271,7 +306,7 @@ const RecordManagement = ({ mode = 'all' }) => {
         <div className="page-container">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                 <div>
-                    <h1 className="page-title" style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '4px' }}>
+                    <h1 className="page-title" style={{ marginBottom: '4px' }}>
                         {mode === 'personal' ? 'Hồ sơ của tôi' : (mode === 'process' ? 'Duyệt hồ sơ' : 'Quản lý hồ sơ')}
                     </h1>
                     <p className="text-muted" style={{ fontSize: '0.9rem' }}>
@@ -419,18 +454,17 @@ const RecordManagement = ({ mode = 'all' }) => {
                                     <div className="form-group">
                                         <label>Loại chuyến đi</label>
                                         <select className="form-control" value={newRecord.ma_loai_chuyen_di} onChange={e => setNewRecord({ ...newRecord, ma_loai_chuyen_di: e.target.value })}>
-                                            <option value="CONG_TAC">Công tác</option>
-                                            <option value="HOI_THAO">Hội thảo/Học tập</option>
-                                            <option value="VIEC_RIENG">Việc riêng</option>
+                                            {tripTypes.map(type => (
+                                                <option key={type.ma_loai} value={type.ma_loai}>{type.ten_loai}</option>
+                                            ))}
                                         </select>
                                     </div>
                                     <div className="form-group">
                                         <label>Quốc gia</label>
                                         <select className="form-control" value={newRecord.ma_quoc_gia} onChange={e => setNewRecord({ ...newRecord, ma_quoc_gia: e.target.value })}>
-                                            <option value="VN">Việt Nam</option>
-                                            <option value="US">Hoa Kỳ</option>
-                                            <option value="JP">Nhật Bản</option>
-                                            <option value="KR">Hàn Quốc</option>
+                                            {countries.map(country => (
+                                                <option key={country.ma_quoc_gia} value={country.ma_quoc_gia}>{country.ten_quoc_gia}</option>
+                                            ))}
                                         </select>
                                     </div>
                                 </div>
@@ -438,11 +472,25 @@ const RecordManagement = ({ mode = 'all' }) => {
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                                     <div className="form-group">
                                         <label>Từ ngày</label>
-                                        <input type="date" className="form-control" required value={newRecord.tu_ngay} onChange={e => setNewRecord({ ...newRecord, tu_ngay: e.target.value })} />
+                                        <input 
+                                            type="date" 
+                                            className="form-control" 
+                                            required 
+                                            min={isEditing ? undefined : todayStr}
+                                            value={newRecord.tu_ngay} 
+                                            onChange={e => setNewRecord({ ...newRecord, tu_ngay: e.target.value })} 
+                                        />
                                     </div>
                                     <div className="form-group">
                                         <label>Đến ngày</label>
-                                        <input type="date" className="form-control" required value={newRecord.den_ngay} onChange={e => setNewRecord({ ...newRecord, den_ngay: e.target.value })} />
+                                        <input 
+                                            type="date" 
+                                            className="form-control" 
+                                            required 
+                                            min={newRecord.tu_ngay || todayStr}
+                                            value={newRecord.den_ngay} 
+                                            onChange={e => setNewRecord({ ...newRecord, den_ngay: e.target.value })} 
+                                        />
                                     </div>
                                 </div>
 

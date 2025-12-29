@@ -200,7 +200,7 @@ const RegulationManagement = () => {
                 <>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '32px' }}>
                         <div>
-                            {renderRegulationSection('QUY_DINH', 'Quy định & Hướng dẫn', '#1a73e8')}
+                            {renderRegulationSection('QUY_DINH', 'Quy định & Hướng dẫn', 'var(--primary-dark)')}
                         </div>
                         <div>
                             {renderRegulationSection('BIEU_MAU', 'Biểu mẫu hồ sơ', '#1e8e3e')}

@@ -48,7 +48,7 @@ const Dashboard = ({ onViewChange }) => {
     return (
         <div className="page-container">
             <div style={{ marginBottom: '32px' }}>
-                <h1 className="page-title" style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '8px' }}>Chào mừng trở lại, {user?.fullName}!</h1>
+                <h1 className="page-title" style={{ marginBottom: '8px' }}>Chào mừng trở lại, {user?.fullName}!</h1>
                 <p className="text-muted">Hệ thống quản lý hồ sơ đi nước ngoài - Trường Đại học Trà Vinh</p>
             </div>
 

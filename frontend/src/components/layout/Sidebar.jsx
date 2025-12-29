@@ -8,6 +8,8 @@ import {
     MdBusiness,
     MdPeople,
     MdSecurity,
+    MdSettings,
+    MdAccountTree,
     MdPerson,
     MdLogout
 } from 'react-icons/md';
@@ -23,6 +25,8 @@ const Sidebar = ({ activeView, onViewChange }) => {
         { id: 'units', label: 'Quản lý đơn vị', icon: <MdBusiness />, roles: ['ADMIN'] },
         { id: 'users', label: 'Quản lý người dùng', icon: <MdPeople />, roles: ['ADMIN'] },
         { id: 'roles', label: 'Quản lý vai trò', icon: <MdSecurity />, roles: ['ADMIN'] },
+        { id: 'system-config', label: 'Cấu hình hệ thống', icon: <MdSettings />, roles: ['ADMIN'] },
+        { id: 'workflows', label: 'Cấu hình luồng', icon: <MdAccountTree />, roles: ['ADMIN'] },
         { id: 'profile', label: 'Cá nhân', icon: <MdPerson />, roles: ['ALL'] },
     ];
 

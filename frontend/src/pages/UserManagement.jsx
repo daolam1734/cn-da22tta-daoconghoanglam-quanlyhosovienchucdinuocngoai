@@ -91,7 +91,7 @@ const UserManagement = () => {
         <div className="page-container">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
                 <div>
-                    <h1 className="page-title" style={{ fontSize: '1.5rem', fontWeight: '700' }}>Quản lý người dùng</h1>
+                    <h1 className="page-title">Quản lý người dùng</h1>
                     <p className="text-muted" style={{ fontSize: '0.9rem' }}>Quản lý tài khoản và phân quyền hệ thống</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => handleOpenModal()}>

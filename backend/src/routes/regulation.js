@@ -5,6 +5,8 @@ const { protect, authorize } = require('../middleware/authMiddleware');
 const upload = require('../utils/upload');
 
 router.get('/', protect, regulationController.getAllRegulations);
+router.get('/trip-types', protect, regulationController.getTripTypes);
+router.get('/countries', protect, regulationController.getCountries);
 router.post('/:id/download', protect, regulationController.incrementDownload);
 
 // Admin only routes

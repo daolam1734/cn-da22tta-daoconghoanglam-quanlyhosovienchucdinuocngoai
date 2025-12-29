@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { MdPerson, MdEmail, MdPhone, MdBadge, MdSchool, MdSave, MdDescription, MdPhotoCamera, MdSecurity } from 'react-icons/md';
+import { MdPerson, MdEmail, MdPhone, MdBadge, MdSchool, MdSave, MdDescription, MdPhotoCamera, MdSecurity, MdClose, MdLock } from 'react-icons/md';
 import profileService from '../services/profileService';
+import authService from '../services/authService';
 
 const Profile = () => {
     const { user } = useAuth();
     const [loading, setLoading] = useState(true);
     const [metadata, setMetadata] = useState({ units: [], partyUnits: [] });
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [passwordData, setPasswordData] = useState({
+        oldPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+    });
+    const [passwordLoading, setPasswordLoading] = useState(false);
     const [profile, setProfile] = useState({
         ho_ten: '',
         email: '',
@@ -30,6 +38,8 @@ const Profile = () => {
         so_the_dang: '',
         chuc_vu_dang: ''
     });
+
+    const todayStr = new Date().toISOString().split('T')[0];
 
     const fetchProfile = async () => {
         setLoading(true);
@@ -121,12 +131,47 @@ const Profile = () => {
         }
     };
 
+    const handlePasswordSubmit = async (e) => {
+        e.preventDefault();
+        
+        if (passwordData.newPassword.length < 6) {
+            alert('Mật khẩu mới phải có ít nhất 6 ký tự!');
+            return;
+        }
+
+        if (passwordData.oldPassword === passwordData.newPassword) {
+            alert('Mật khẩu mới không được trùng với mật khẩu cũ!');
+            return;
+        }
+
+        if (passwordData.newPassword !== passwordData.confirmPassword) {
+            alert('Xác nhận mật khẩu mới không khớp!');
+            return;
+        }
+        
+        setPasswordLoading(true);
+        try {
+            const res = await authService.changePassword(passwordData.oldPassword, passwordData.newPassword);
+            if (res.success) {
+                alert('Đổi mật khẩu thành công!');
+                setShowPasswordModal(false);
+                setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
+            } else {
+                alert(res.message);
+            }
+        } catch (error) {
+            alert('Lỗi khi đổi mật khẩu');
+        } finally {
+            setPasswordLoading(false);
+        }
+    };
+
     if (loading) return <div className="page-container">Đang tải thông tin cá nhân...</div>;
 
     return (
         <div className="page-container">
             <div style={{ marginBottom: '32px' }}>
-                <h1 className="page-title" style={{ fontSize: '1.5rem', fontWeight: '700' }}>Thông tin cá nhân</h1>
+                <h1 className="page-title">Thông tin cá nhân</h1>
                 <p className="text-muted" style={{ fontSize: '0.9rem' }}>Quản lý thông tin cá nhân và hồ sơ của bạn</p>
             </div>
 
@@ -204,7 +249,7 @@ const Profile = () => {
                             </div>
                             <div className="form-group">
                                 <label>Ngày sinh</label>
-                                <input type="date" className="form-control" name="ngay_sinh" value={profile.ngay_sinh} onChange={handleChange} />
+                                <input type="date" className="form-control" name="ngay_sinh" value={profile.ngay_sinh} onChange={handleChange} max={todayStr} />
                             </div>
                             <div className="form-group">
                                 <label>Giới tính</label>
@@ -331,16 +376,25 @@ const Profile = () => {
                             </div>
                             <div className="form-group">
                                 <label>Ngày cấp</label>
-                                <input type="date" className="form-control" name="ngay_cap_ho_chieu" value={profile.ngay_cap_ho_chieu} onChange={handleChange} />
+                                <input type="date" className="form-control" name="ngay_cap_ho_chieu" value={profile.ngay_cap_ho_chieu} onChange={handleChange} max={todayStr} />
                             </div>
                             <div className="form-group">
                                 <label>Ngày hết hạn</label>
-                                <input type="date" className="form-control" name="ngay_het_han_ho_chieu" value={profile.ngay_het_han_ho_chieu} onChange={handleChange} />
+                                <input type="date" className="form-control" name="ngay_het_han_ho_chieu" value={profile.ngay_het_han_ho_chieu} onChange={handleChange} min={profile.ngay_cap_ho_chieu || todayStr} />
                             </div>
                         </div>
                     </div>
 
-                    <div style={{ marginTop: '32px', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #f1f3f4', paddingTop: '24px' }}>
+                    <div style={{ marginTop: '32px', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #f1f3f4', paddingTop: '24px', gap: '12px' }}>
+                        <button 
+                            type="button" 
+                            className="btn btn-outline" 
+                            onClick={() => setShowPasswordModal(true)}
+                            style={{ padding: '10px 24px', display: 'flex', alignItems: 'center', gap: '8px' }}
+                        >
+                            <MdLock size={20} />
+                            Đổi mật khẩu
+                        </button>
                         <button type="submit" className="btn btn-primary" style={{ padding: '10px 24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <MdSave size={20} />
                             Cập nhật thông tin
@@ -348,6 +402,62 @@ const Profile = () => {
                     </div>
                 </form>
             </div>
+
+            {showPasswordModal && (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '450px' }}>
+                        <div className="modal-header">
+                            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <MdLock /> Đổi mật khẩu
+                            </h3>
+                            <button className="btn-icon" onClick={() => setShowPasswordModal(false)}>
+                                <MdClose size={24} />
+                            </button>
+                        </div>
+                        <form onSubmit={handlePasswordSubmit}>
+                            <div className="modal-body">
+                                <div className="form-group">
+                                    <label>Mật khẩu hiện tại</label>
+                                    <input 
+                                        type="password" 
+                                        className="form-control" 
+                                        required
+                                        value={passwordData.oldPassword}
+                                        onChange={(e) => setPasswordData({...passwordData, oldPassword: e.target.value})}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Mật khẩu mới</label>
+                                    <input 
+                                        type="password" 
+                                        className="form-control" 
+                                        required
+                                        minLength={6}
+                                        value={passwordData.newPassword}
+                                        onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Xác nhận mật khẩu mới</label>
+                                    <input 
+                                        type="password" 
+                                        className="form-control" 
+                                        required
+                                        value={passwordData.confirmPassword}
+                                        onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button type="button" className="btn btn-outline" onClick={() => setShowPasswordModal(false)}>Hủy</button>
+                                <button type="submit" className="btn btn-primary" disabled={passwordLoading}>
+                                    {passwordLoading ? 'Đang xử lý...' : 'Cập nhật mật khẩu'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -1,5 +1,6 @@
 :root {
     --primary-color: #1a73e8;
+    --primary-dark: #003366;
     --secondary-color: #5f6368;
     --bg-color: #f1f3f4;
     --sidebar-width: 260px;
@@ -117,6 +118,16 @@ body {
     flex: 1;
 }
 
+.page-title {
+    color: var(--primary-dark);
+    font-weight: 700;
+    font-size: 1.5rem;
+}
+
+h2, h3 {
+    color: var(--primary-dark);
+}
+
 /* Cards */
 .card {
     background: var(--white);
@@ -129,6 +140,7 @@ body {
     padding: 16px 24px;
     border-bottom: 1px solid var(--border-color);
     font-weight: 600;
+    color: var(--primary-dark);
 }
 
 .card-body {
@@ -271,6 +283,11 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+
+.modal-header h3 {
+    color: var(--primary-dark);
+    margin: 0;
 }
 
 .modal-body {

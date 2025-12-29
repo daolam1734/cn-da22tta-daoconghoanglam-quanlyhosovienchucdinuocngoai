@@ -112,8 +112,74 @@ const getMe = async (req, res) => {
     }
 };
 
+const changePassword = async (req, res) => {
+    const { oldPassword, newPassword } = req.body;
+    const userId = req.user.id;
+
+    try {
+        // 0. Validation
+        if (!newPassword || newPassword.length < 6) {
+            return res.status(400).json({ success: false, message: 'Mật khẩu mới phải có ít nhất 6 ký tự' });
+        }
+
+        if (oldPassword === newPassword) {
+            return res.status(400).json({ success: false, message: 'Mật khẩu mới không được trùng với mật khẩu cũ' });
+        }
+
+        // 1. Get user
+        const userResult = await db.query('SELECT mat_khau_hash FROM NguoiDung WHERE id = $1', [userId]);
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Người dùng không tồn tại' });
+        }
+
+        const user = userResult.rows[0];
+
+        // 2. Verify old password
+        const isMatch = await bcrypt.compare(oldPassword, user.mat_khau_hash);
+        if (!isMatch) {
+            return res.status(400).json({ success: false, message: 'Mật khẩu cũ không chính xác' });
+        }
+
+        // 3. Hash new password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        // 4. Update password
+        await db.query('UPDATE NguoiDung SET mat_khau_hash = $1 WHERE id = $2', [hashedPassword, userId]);
+
+        res.json({ success: true, message: 'Đổi mật khẩu thành công' });
+    } catch (error) {
+        console.error('Change password error:', error);
+        res.status(500).json({ success: false, message: 'Lỗi hệ thống' });
+    }
+};
+
+const forgotPassword = async (req, res) => {
+    const { email } = req.body;
+
+    try {
+        const userResult = await db.query('SELECT id FROM NguoiDung WHERE email = $1', [email]);
+        
+        // Luôn trả về thành công để bảo mật (không tiết lộ email có tồn tại hay không)
+        res.json({ 
+            success: true, 
+            message: 'Nếu email tồn tại trong hệ thống, hướng dẫn khôi phục mật khẩu sẽ được gửi đến bạn. Vui lòng kiểm tra hộp thư (bao gồm cả thư rác).' 
+        });
+
+        if (userResult.rows.length > 0) {
+            // Ở đây sẽ thực hiện logic tạo token và gửi email thực tế
+            console.log(`Yêu cầu khôi phục mật khẩu cho email: ${email}`);
+        }
+    } catch (error) {
+        console.error('Forgot password error:', error);
+        res.status(500).json({ success: false, message: 'Lỗi hệ thống' });
+    }
+};
+
 module.exports = {
     login,
     logout,
-    getMe
+    getMe,
+    changePassword,
+    forgotPassword
 };

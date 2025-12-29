@@ -95,3 +95,23 @@ exports.incrementDownload = async (req, res) => {
         res.status(500).json({ success: false });
     }
 };
+
+exports.getTripTypes = async (req, res) => {
+    try {
+        const result = await db.query('SELECT * FROM LoaiChuyenDi WHERE trang_thai = TRUE ORDER BY thu_tu');
+        res.json({ success: true, data: result.rows });
+    } catch (error) {
+        console.error('Get trip types error:', error);
+        res.status(500).json({ success: false, message: 'Lỗi server' });
+    }
+};
+
+exports.getCountries = async (req, res) => {
+    try {
+        const result = await db.query('SELECT * FROM QuocGia ORDER BY ten_quoc_gia');
+        res.json({ success: true, data: result.rows });
+    } catch (error) {
+        console.error('Get countries error:', error);
+        res.status(500).json({ success: false, message: 'Lỗi server' });
+    }
+};

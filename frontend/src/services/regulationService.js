@@ -50,6 +50,24 @@ const regulationService = {
             }
         });
         return response.json();
+    },
+
+    getTripTypes: async () => {
+        const response = await fetch(`${API_URL}/trip-types`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        return response.json();
+    },
+
+    getCountries: async () => {
+        const response = await fetch(`${API_URL}/countries`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        return response.json();
     }
 };
 

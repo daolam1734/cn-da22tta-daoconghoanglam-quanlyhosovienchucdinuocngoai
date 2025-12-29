@@ -92,6 +92,7 @@ const autoProcessSteps = async (client, recordId, ownerId, currentStatus, isDang
 
         let status = currentStatus;
         let changed = true;
+        let da_duyet_dang = false;
 
         const statusToStep = {
             'CHO_DON_VI': 'TRUONG_DON_VI_DUYET',
@@ -111,6 +112,7 @@ const autoProcessSteps = async (client, recordId, ownerId, currentStatus, isDang
                 nextStatus = 'CHO_DANG_UY';
             } else if (status === 'CHO_DANG_UY' && ownerRoles.includes('DANG_UY')) {
                 nextStatus = 'CHO_TCNS';
+                da_duyet_dang = true;
             } else if (status === 'CHO_TCNS' && ownerRoles.includes('TCNS')) {
                 nextStatus = 'CHO_BGH';
             } else if (status === 'CHO_BGH' && ownerRoles.includes('BGH')) {
@@ -129,10 +131,10 @@ const autoProcessSteps = async (client, recordId, ownerId, currentStatus, isDang
             }
         }
 
-        return status;
+        return { status, da_duyet_dang };
     } catch (error) {
         console.error('Auto process steps error:', error);
-        return currentStatus; // Fallback to current status on error
+        return { status: currentStatus, da_duyet_dang: false };
     }
 };
 
@@ -172,9 +174,16 @@ exports.createRecord = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Tài khoản của bạn không gắn với mã viên chức. Vui lòng đăng nhập lại hoặc liên hệ quản trị viên.' });
         }
 
-        // Check if user is Dang Vien
-        const dangVienResult = await client.query("SELECT 1 FROM DangVien WHERE ma_vien_chuc = $1", [ma_vien_chuc]);
-        const isDangVien = dangVienResult.rows.length > 0;
+        // Check if user is Dang Vien and trip requires Party approval
+        const dangVienResult = await client.query(
+            "SELECT 1 FROM DangVien WHERE ma_vien_chuc = $1 AND trang_thai = 'DANG_HOAT_DONG'", 
+            [ma_vien_chuc]
+        );
+        const tripTypeResult = await client.query(
+            "SELECT yeu_cau_duyet_dang FROM LoaiChuyenDi WHERE ma_loai = $1",
+            [ma_loai_chuyen_di]
+        );
+        const requiresPartyApproval = dangVienResult.rows.length > 0 && (tripTypeResult.rows[0]?.yeu_cau_duyet_dang || false);
 
         // Basic validation
         if (!ma_loai_chuyen_di || !ma_quoc_gia || !tu_ngay || !den_ngay || !noi_dung_cong_viec) {
@@ -182,26 +191,33 @@ exports.createRecord = async (req, res) => {
         }
 
         let status = submit_immediately === 'true' ? 'CHO_DON_VI' : 'DRAFT';
+        let da_duyet_dang = false;
         const ma_ho_so = await generateRecordId();
 
         // Auto-skip steps if submitted
         if (submit_immediately === 'true') {
-            status = await autoProcessSteps(client, ma_ho_so, req.user.id, status, isDangVien);
+            const autoResult = await autoProcessSteps(client, ma_ho_so, req.user.id, status, requiresPartyApproval);
+            status = autoResult.status;
+            da_duyet_dang = autoResult.da_duyet_dang;
         }
 
         const query = `
       INSERT INTO HoSoDiNuocNgoai (
         ma_ho_so, ma_vien_chuc, ma_loai_chuyen_di, ma_quoc_gia, 
         tu_ngay, den_ngay, dia_diem_cu_the, noi_dung_cong_viec, 
-        nguon_kinh_phi, kinh_phi, ma_trang_thai, nguoi_tao, ngay_gui_ho_so
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        nguon_kinh_phi, kinh_phi, ma_trang_thai, nguoi_tao, ngay_gui_ho_so,
+        da_duyet_dang, ma_quyet_dinh_dang, ngay_duyet_dang
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
     `;
 
         const values = [
             ma_ho_so, ma_vien_chuc, ma_loai_chuyen_di, ma_quoc_gia,
             tu_ngay, den_ngay, dia_diem_cu_the, noi_dung_cong_viec,
             nguon_kinh_phi, kinh_phi || 0, status, req.user.id,
-            submit_immediately === 'true' ? new Date() : null
+            submit_immediately === 'true' ? new Date() : null,
+            da_duyet_dang,
+            da_duyet_dang ? `QD-DANG-${ma_ho_so}` : null,
+            da_duyet_dang ? new Date() : null
         ];
 
         await client.query(query, values);
@@ -281,15 +297,27 @@ exports.updateRecord = async (req, res) => {
             throw new Error('Hồ sơ đang trong quá trình xử lý, không thể chỉnh sửa');
         }
 
-        // Check if user is Dang Vien
-        const dangVienResult = await client.query("SELECT 1 FROM DangVien WHERE ma_vien_chuc = $1", [req.user.ma_vien_chuc]);
-        const isDangVien = dangVienResult.rows.length > 0;
+        // Check if user is Dang Vien and trip requires Party approval
+        const dangVienResult = await client.query(
+            "SELECT 1 FROM DangVien WHERE ma_vien_chuc = $1 AND trang_thai = 'DANG_HOAT_DONG'", 
+            [req.user.ma_vien_chuc]
+        );
+        const tripTypeResult = await client.query(
+            "SELECT yeu_cau_duyet_dang FROM LoaiChuyenDi WHERE ma_loai = $1",
+            [ma_loai_chuyen_di]
+        );
+        const requiresPartyApproval = dangVienResult.rows.length > 0 && (tripTypeResult.rows[0]?.yeu_cau_duyet_dang || false);
 
         let status = submit_immediately === 'true' ? 'CHO_DON_VI' : record.ma_trang_thai;
+        let da_duyet_dang = record.da_duyet_dang;
 
         // Auto-skip steps if submitted
         if (submit_immediately === 'true') {
-            status = await autoProcessSteps(client, id, req.user.id, status, isDangVien);
+            const autoResult = await autoProcessSteps(client, id, req.user.id, status, requiresPartyApproval);
+            status = autoResult.status;
+            if (autoResult.da_duyet_dang) {
+                da_duyet_dang = true;
+            }
         }
 
         const query = `
@@ -297,15 +325,18 @@ exports.updateRecord = async (req, res) => {
         ma_loai_chuyen_di = $1, ma_quoc_gia = $2, tu_ngay = $3, den_ngay = $4,
         dia_diem_cu_the = $5, noi_dung_cong_viec = $6, nguon_kinh_phi = $7, 
         kinh_phi = $8, ma_trang_thai = $9, nguoi_cap_nhat = $10, updated_at = CURRENT_TIMESTAMP,
-        ngay_gui_ho_so = CASE WHEN $11 = 'true' AND ngay_gui_ho_so IS NULL THEN CURRENT_TIMESTAMP ELSE ngay_gui_ho_so END
-      WHERE ma_ho_so = $12
+        ngay_gui_ho_so = CASE WHEN $11 = 'true' AND ngay_gui_ho_so IS NULL THEN CURRENT_TIMESTAMP ELSE ngay_gui_ho_so END,
+        da_duyet_dang = $12,
+        ma_quyet_dinh_dang = CASE WHEN $12 = true AND ma_quyet_dinh_dang IS NULL THEN $13 ELSE ma_quyet_dinh_dang END,
+        ngay_duyet_dang = CASE WHEN $12 = true AND ngay_duyet_dang IS NULL THEN CURRENT_DATE ELSE ngay_duyet_dang END
+      WHERE ma_ho_so = $14
       RETURNING *
     `;
 
         const values = [
             ma_loai_chuyen_di, ma_quoc_gia, tu_ngay, den_ngay,
             dia_diem_cu_the, noi_dung_cong_viec, nguon_kinh_phi,
-            kinh_phi || 0, status, req.user.id, submit_immediately, id
+            kinh_phi || 0, status, req.user.id, submit_immediately, da_duyet_dang, `QD-DANG-${id}`, id
         ];
 
         await client.query(query, values);
@@ -367,20 +398,45 @@ exports.submitRecord = async (req, res) => {
             throw new Error('Hồ sơ đã được gửi hoặc đang trong quá trình xử lý');
         }
 
-        // Check if user is Dang Vien
-        const dangVienResult = await client.query("SELECT 1 FROM DangVien WHERE ma_vien_chuc = $1", [req.user.ma_vien_chuc]);
-        const isDangVien = dangVienResult.rows.length > 0;
+        // Check if user is Dang Vien and trip requires Party approval
+        const dangVienResult = await client.query(
+            "SELECT 1 FROM DangVien WHERE ma_vien_chuc = $1 AND trang_thai = 'DANG_HOAT_DONG'", 
+            [req.user.ma_vien_chuc]
+        );
+        const tripTypeResult = await client.query(
+            "SELECT yeu_cau_duyet_dang FROM LoaiChuyenDi WHERE ma_loai = $1",
+            [record.ma_loai_chuyen_di]
+        );
+        const requiresPartyApproval = dangVienResult.rows.length > 0 && (tripTypeResult.rows[0]?.yeu_cau_duyet_dang || false);
 
         let status = 'CHO_DON_VI';
+        let da_duyet_dang = record.da_duyet_dang;
         
         // Auto-skip steps
-        status = await autoProcessSteps(client, id, req.user.id, status, isDangVien);
+        const autoResult = await autoProcessSteps(client, id, req.user.id, status, requiresPartyApproval);
+        status = autoResult.status;
+        if (autoResult.da_duyet_dang) {
+            da_duyet_dang = true;
+        }
 
         // Update status
-        await client.query(
-            "UPDATE HoSoDiNuocNgoai SET ma_trang_thai = $1, ngay_gui_ho_so = CURRENT_TIMESTAMP WHERE ma_ho_so = $2",
-            [status, id]
-        );
+        if (da_duyet_dang && !record.ma_quyet_dinh_dang) {
+            await client.query(
+                `UPDATE HoSoDiNuocNgoai 
+                 SET ma_trang_thai = $1, 
+                     da_duyet_dang = $2, 
+                     ma_quyet_dinh_dang = $3,
+                     ngay_duyet_dang = CURRENT_DATE,
+                     ngay_gui_ho_so = CURRENT_TIMESTAMP 
+                 WHERE ma_ho_so = $4`,
+                [status, da_duyet_dang, `QD-DANG-${id}`, id]
+            );
+        } else {
+            await client.query(
+                "UPDATE HoSoDiNuocNgoai SET ma_trang_thai = $1, da_duyet_dang = $2, ngay_gui_ho_so = CURRENT_TIMESTAMP WHERE ma_ho_so = $3",
+                [status, da_duyet_dang, id]
+            );
+        }
 
         // Notify next processors if not already finished
         if (status !== 'DA_DUYET') {
@@ -613,7 +669,12 @@ exports.processRecord = async (req, res) => {
         await client.query('BEGIN');
 
         const recordResult = await client.query(
-            "SELECT h.*, v.ma_don_vi, dv.ma_don_vi_dang FROM HoSoDiNuocNgoai h JOIN VienChuc v ON h.ma_vien_chuc = v.ma_vien_chuc LEFT JOIN DangVien dv ON v.ma_vien_chuc = dv.ma_vien_chuc WHERE h.ma_ho_so = $1",
+            `SELECT h.*, v.ma_don_vi, dv.ma_vien_chuc as dang_vien_id, dv.trang_thai as dang_vien_status, l.yeu_cau_duyet_dang 
+             FROM HoSoDiNuocNgoai h 
+             JOIN VienChuc v ON h.ma_vien_chuc = v.ma_vien_chuc 
+             LEFT JOIN DangVien dv ON v.ma_vien_chuc = dv.ma_vien_chuc 
+             JOIN LoaiChuyenDi l ON h.ma_loai_chuyen_di = l.ma_loai
+             WHERE h.ma_ho_so = $1`,
             [id]
         );
 
@@ -640,18 +701,21 @@ exports.processRecord = async (req, res) => {
 
         const currentStatus = record.ma_trang_thai;
         let nextStatus = currentStatus;
-        const isDangVien = !!record.ma_don_vi_dang;
+        let da_duyet_dang = record.da_duyet_dang;
+        const isDangVien = record.dang_vien_id && record.dang_vien_status === 'DANG_HOAT_DONG';
+        const requiresPartyApproval = isDangVien && record.yeu_cau_duyet_dang;
 
         if (action === 'APPROVED') {
             switch (currentStatus) {
                 case 'CHO_DON_VI':
-                    nextStatus = isDangVien ? 'CHO_CHI_BO' : 'CHO_TCNS';
+                    nextStatus = requiresPartyApproval ? 'CHO_CHI_BO' : 'CHO_TCNS';
                     break;
                 case 'CHO_CHI_BO':
                     nextStatus = 'CHO_DANG_UY';
                     break;
                 case 'CHO_DANG_UY':
                     nextStatus = 'CHO_TCNS';
+                    da_duyet_dang = true;
                     break;
                 case 'CHO_TCNS':
                     nextStatus = 'CHO_BGH';
@@ -661,9 +725,19 @@ exports.processRecord = async (req, res) => {
                     break;
             }
 
+            // Safety: If we are moving to or past TCNS/BGH/DA_DUYET and it requires Party approval,
+            // ensure da_duyet_dang is true. This handles old records or edge cases.
+            if (requiresPartyApproval && ['CHO_TCNS', 'CHO_BGH', 'DA_DUYET'].includes(nextStatus)) {
+                da_duyet_dang = true;
+            }
+
             // Auto-skip further steps if owner has the required roles for next steps
             if (nextStatus !== 'DA_DUYET') {
-                nextStatus = await autoProcessSteps(client, id, record.nguoi_tao, nextStatus, isDangVien);
+                const autoResult = await autoProcessSteps(client, id, record.nguoi_tao, nextStatus, requiresPartyApproval);
+                nextStatus = autoResult.status;
+                if (autoResult.da_duyet_dang) {
+                    da_duyet_dang = true;
+                }
             }
         } else if (action === 'REJECTED') {
             nextStatus = 'TU_CHOI';
@@ -673,10 +747,26 @@ exports.processRecord = async (req, res) => {
 
         const ownerId = record.nguoi_tao;
 
-        await client.query(
-            "UPDATE HoSoDiNuocNgoai SET ma_trang_thai = $1, updated_at = CURRENT_TIMESTAMP WHERE ma_ho_so = $2",
-            [nextStatus, id]
-        );
+        // If Party approval is required and we are setting da_duyet_dang = true,
+        // we MUST provide dummy values for ma_quyet_dinh_dang and ngay_duyet_dang
+        // to satisfy the database check constraint 'check_quyet_dinh_dang'
+        if (da_duyet_dang && !record.ma_quyet_dinh_dang) {
+            await client.query(
+                `UPDATE HoSoDiNuocNgoai 
+                 SET ma_trang_thai = $1, 
+                     da_duyet_dang = $2, 
+                     ma_quyet_dinh_dang = $3,
+                     ngay_duyet_dang = CURRENT_DATE,
+                     updated_at = CURRENT_TIMESTAMP 
+                 WHERE ma_ho_so = $4`,
+                [nextStatus, da_duyet_dang, `QD-DANG-${id}`, id]
+            );
+        } else {
+            await client.query(
+                "UPDATE HoSoDiNuocNgoai SET ma_trang_thai = $1, da_duyet_dang = $2, updated_at = CURRENT_TIMESTAMP WHERE ma_ho_so = $3",
+                [nextStatus, da_duyet_dang, id]
+            );
+        }
 
         // Map status to step code
         const statusToStep = {
