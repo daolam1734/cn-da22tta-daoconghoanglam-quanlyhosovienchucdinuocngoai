@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import regulationService from '../services/regulationService';
+import FileViewer from '../components/common/FileViewer';
 import { 
     MdDownload, 
     MdAdd, 
@@ -11,7 +12,8 @@ import {
     MdInsertDriveFile,
     MdClose,
     MdSearch,
-    MdFilterList
+    MdFilterList,
+    MdVisibility
 } from 'react-icons/md';
 
 const RegulationManagement = () => {
@@ -23,6 +25,7 @@ const RegulationManagement = () => {
     const [showModal, setShowModal] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [viewingFile, setViewingFile] = useState(null);
     const [formData, setFormData] = useState({
         tieu_de: '',
         mo_ta: '',
@@ -149,9 +152,18 @@ const RegulationManagement = () => {
                                 <div className="text-muted" style={{ fontSize: '0.7rem' }}>
                                     {item.luot_tai} lượt tải • {new Date(item.ngay_tao || item.created_at).toLocaleDateString('vi-VN')}
                                 </div>
-                                <button className="btn btn-outline" style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }} onClick={() => handleDownload(item)}>
-                                    <MdDownload size={14} /> Tải xuống
-                                </button>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button 
+                                        className="btn btn-outline" 
+                                        style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }} 
+                                        onClick={() => setViewingFile(item)}
+                                    >
+                                        <MdVisibility size={14} /> Xem
+                                    </button>
+                                    <button className="btn btn-outline" style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }} onClick={() => handleDownload(item)}>
+                                        <MdDownload size={14} /> Tải xuống
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     ))}
@@ -267,6 +279,13 @@ const RegulationManagement = () => {
                         </form>
                     </div>
                 </div>
+            )}
+
+            {viewingFile && (
+                <FileViewer 
+                    file={viewingFile} 
+                    onClose={() => setViewingFile(null)} 
+                />
             )}
         </div>
     );

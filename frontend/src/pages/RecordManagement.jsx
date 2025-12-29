@@ -3,6 +3,7 @@ import recordService from '../services/recordService';
 import reportService from '../services/reportService';
 import regulationService from '../services/regulationService';
 import { useAuth } from '../contexts/AuthContext';
+import FileViewer from '../components/common/FileViewer';
 import { 
     MdAdd, 
     MdSearch, 
@@ -32,6 +33,7 @@ const RecordManagement = ({ mode = 'all' }) => {
     const [tripTypes, setTripTypes] = useState([]);
     const [countries, setCountries] = useState([]);
     const [processFiles, setProcessFiles] = useState([]);
+    const [viewingFile, setViewingFile] = useState(null);
     const [newReport, setNewReport] = useState({
         noi_dung_bao_cao: '',
         ket_qua_dat_duoc: '',
@@ -660,10 +662,13 @@ const RecordManagement = ({ mode = 'all' }) => {
                                                     <label className="text-muted" style={{ fontSize: '0.75rem', display: 'block', marginBottom: '4px' }}>File báo cáo</label>
                                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                                                         {reportData.files.map(file => (
-                                                            <a key={file.id} href={`http://localhost:3000/uploads/${file.duong_dan}`} target="_blank" rel="noopener noreferrer"
-                                                                style={{ fontSize: '0.8rem', padding: '4px 8px', backgroundColor: '#fff', border: '1px solid #dadce0', borderRadius: '4px', textDecoration: 'none', color: '#1a73e8' }}>
+                                                            <button 
+                                                                key={file.id} 
+                                                                onClick={() => setViewingFile(file)}
+                                                                style={{ fontSize: '0.8rem', padding: '4px 8px', backgroundColor: '#fff', border: '1px solid #dadce0', borderRadius: '4px', cursor: 'pointer', color: '#1a73e8' }}
+                                                            >
                                                                 {file.ten_file_goc}
-                                                            </a>
+                                                            </button>
                                                         ))}
                                                     </div>
                                                 </div>
@@ -687,7 +692,7 @@ const RecordManagement = ({ mode = 'all' }) => {
                                             {selectedRecord.files.map(file => (
                                                 <div key={file.id} style={{ padding: '10px 12px', border: '1px solid #dadce0', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff' }}>
                                                     <span style={{ fontSize: '0.85rem', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>{file.ten_file_goc}</span>
-                                                    <a href={`http://localhost:3000/uploads/${file.duong_dan}`} target="_blank" rel="noopener noreferrer" className="btn btn-outline" style={{ padding: '4px 10px', fontSize: '0.75rem' }}>Xem</a>
+                                                    <button onClick={() => setViewingFile(file)} className="btn btn-outline" style={{ padding: '4px 10px', fontSize: '0.75rem' }}>Xem</button>
                                                 </div>
                                             ))}
                                         </div>
@@ -753,6 +758,13 @@ const RecordManagement = ({ mode = 'all' }) => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {viewingFile && (
+                <FileViewer 
+                    file={viewingFile} 
+                    onClose={() => setViewingFile(null)} 
+                />
             )}
         </div>
     );
