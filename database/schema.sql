@@ -158,48 +158,63 @@ INSERT INTO
     TrangThaiHoSo (
         ma_trang_thai,
         ten_trang_thai,
-        nhom_trang_thai
+        nhom_trang_thai,
+        thu_tu
     )
-VALUES ('DRAFT', 'Nháp', 'DRAFT'),
+VALUES ('DRAFT', 'Nháp', 'DRAFT', 0),
     (
-        'GUI_DUYET',
-        'Đã gửi duyệt',
-        'PENDING'
+        'CHO_DON_VI',
+        'Chờ đơn vị cho ý kiến',
+        'PENDING',
+        1
     ),
     (
-        'DUYET_DON_VI',
-        'Đã duyệt đơn vị',
-        'PROCESSING'
+        'CHO_CHI_BO',
+        'Chờ Chi bộ xem xét',
+        'PROCESSING',
+        2
     ),
     (
-        'DUYET_DANG',
-        'Đã duyệt đảng',
-        'PROCESSING'
+        'CHO_DANG_UY',
+        'Chờ Đảng ủy quyết định',
+        'PROCESSING',
+        3
     ),
     (
-        'CAN_BO_SUNG',
-        'Cần bổ sung hồ sơ',
-        'PROCESSING'
+        'CHO_TCNS',
+        'Chờ Phòng TCNS cho ý kiến',
+        'PROCESSING',
+        4
+    ),
+    (
+        'CHO_BGH',
+        'Chờ BGH ra quyết định',
+        'PROCESSING',
+        5
     ),
     (
         'DA_DUYET',
-        'Đã phê duyệt',
-        'COMPLETED'
+        'Đã phê duyệt (BGH ký)',
+        'COMPLETED',
+        6
     ),
     (
         'TU_CHOI',
         'Từ chối',
-        'COMPLETED'
+        'COMPLETED',
+        7
+    ),
+    (
+        'YEU_CAU_BO_SUNG',
+        'Yêu cầu bổ sung',
+        'PROCESSING',
+        8
     ),
     (
         'DA_HUY',
         'Đã hủy',
-        'CANCELLED'
-    ),
-    (
-        'DA_HOAN_THANH',
-        'Đã hoàn thành',
-        'COMPLETED'
+        'CANCELLED',
+        9
     );
 
 -- ============================================
@@ -233,16 +248,42 @@ CREATE TABLE VaiTro (
 );
 
 INSERT INTO
-    VaiTro (ma_vai_tro, ten_vai_tro)
-VALUES ('ADMIN', 'Quản trị hệ thống'),
-    ('TRUONG_DON_VI', 'Trưởng đơn vị'),
-    ('DANG_UY', 'Đảng ủy'),
-    ('CHI_BO', 'Chi bộ'),
-    ('VIEN_CHUC', 'Viên chức'),
-    ('TCNS', 'Phòng Tổ chức Nhân sự'),
-    ('BGH', 'Ban Giám hiệu'),
-    ('KE_TOAN', 'Kế toán'),
-    ('HANH_CHINH', 'Hành chính');
+    VaiTro (ma_vai_tro, ten_vai_tro, mo_ta)
+VALUES (
+        'ADMIN',
+        'Quản trị hệ thống',
+        'Toàn quyền quản trị'
+    ),
+    (
+        'VIEN_CHUC',
+        'Viên chức',
+        'Người nộp hồ sơ'
+    ),
+    (
+        'TRUONG_DON_VI',
+        'Trưởng đơn vị',
+        'Duyệt cấp đơn vị'
+    ),
+    (
+        'CHI_BO',
+        'Chi bộ',
+        'Duyệt cấp Chi bộ (cho Đảng viên)'
+    ),
+    (
+        'DANG_UY',
+        'Đảng ủy',
+        'Duyệt cấp Đảng ủy (cho Đảng viên)'
+    ),
+    (
+        'TCNS',
+        'Phòng Tổ chức Nhân sự',
+        'Thẩm định hồ sơ'
+    ),
+    (
+        'BGH',
+        'Ban Giám hiệu',
+        'Phê duyệt cuối cùng'
+    );
 
 CREATE TABLE NguoiDungVaiTro (
     nguoi_dung_id INTEGER REFERENCES NguoiDung (id) ON DELETE CASCADE,
@@ -461,12 +502,6 @@ ma_don_vi_dang VARCHAR(20) REFERENCES DonViDang (ma_don_vi_dang), -- Cho duyệt
 
 -- Ràng buộc
 
-CHECK (
-        (loai_xu_ly = 'HANH_CHINH' AND ma_don_vi IS NOT NULL) OR
-        (loai_xu_ly = 'DANG' AND ma_don_vi_dang IS NOT NULL) OR
-        (loai_xu_ly = 'PHOI_HOP' AND ma_don_vi IS NOT NULL AND ma_don_vi_dang IS NOT NULL)
-    ),
-    
     thoi_gian_du_kien INTEGER CHECK (thoi_gian_du_kien > 0),
     
     UNIQUE(ma_luong, thu_tu),
@@ -1011,3 +1046,86 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trigger_check_overlap
 BEFORE INSERT OR UPDATE ON HoSoDiNuocNgoai
 FOR EACH ROW EXECUTE FUNCTION check_overlapping_trips();
+-- ============================================
+-- G. NH�M QUY �?NH & BI?U M?U
+-- ============================================
+
+CREATE TABLE QuyDinhBieuMau (
+    id SERIAL PRIMARY KEY,
+    tieu_de VARCHAR(255) NOT NULL,
+    mo_ta TEXT,
+    loai VARCHAR(50) NOT NULL, -- 'QUY_DINH', 'BIEU_MAU'
+    ten_file VARCHAR(255) NOT NULL,
+    ten_file_goc VARCHAR(255) NOT NULL,
+    duong_dan VARCHAR(500) NOT NULL,
+    kich_thuoc INTEGER,
+    mime_type VARCHAR(100),
+    nguoi_dang_id INTEGER REFERENCES NguoiDung (id),
+    luot_tai INTEGER DEFAULT 0,
+    trang_thai BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_quy_dinh_loai ON QuyDinhBieuMau (loai);
+
+-- ============================================
+-- H. D? LI?U KH?I T?O WORKFLOW
+-- ============================================
+
+-- C?p nh?t LuongXuLy m?u cho quy tr�nh chu?n
+INSERT INTO
+    LuongXuLy (ma_luong, ten_luong, mo_ta)
+VALUES (
+        'QUY_TRINH_CHINH',
+        'Quy tr�nh ph� duy?t h? so di nu?c ngo�i',
+        'Quy tr�nh chu?n t? Vi�n ch?c d?n BGH'
+    )
+ON CONFLICT (ma_luong) DO NOTHING;
+
+-- C?p nh?t BuocXuLy cho quy tr�nh chu?n
+INSERT INTO
+    BuocXuLy (
+        ma_luong,
+        thu_tu,
+        ten_buoc,
+        ma_buoc,
+        loai_xu_ly
+    )
+VALUES (
+        'QUY_TRINH_CHINH',
+        1,
+        'Tru?ng don v? cho � ki?n',
+        'TRUONG_DON_VI_DUYET',
+        'HANH_CHINH'
+    ),
+    (
+        'QUY_TRINH_CHINH',
+        2,
+        'Chi b? xem x�t',
+        'CHI_BO_DUYET',
+        'DANG'
+    ),
+    (
+        'QUY_TRINH_CHINH',
+        3,
+        '�?ng ?y quy?t d?nh',
+        'DANG_UY_DUYET',
+        'DANG'
+    ),
+    (
+        'QUY_TRINH_CHINH',
+        4,
+        'Ph�ng TCNS cho � ki?n',
+        'TCNS_DUYET',
+        'HANH_CHINH'
+    ),
+    (
+        'QUY_TRINH_CHINH',
+        5,
+        'BGH ra quy?t d?nh',
+        'BGH_DUYET',
+        'HANH_CHINH'
+    )
+ON CONFLICT (ma_luong, thu_tu) DO NOTHING;
+
