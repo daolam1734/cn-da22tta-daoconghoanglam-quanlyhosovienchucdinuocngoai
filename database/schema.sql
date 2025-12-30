@@ -235,10 +235,12 @@ CREATE TABLE VaiTro (
 INSERT INTO
     VaiTro (ma_vai_tro, ten_vai_tro)
 VALUES ('ADMIN', 'Quản trị hệ thống'),
-    ('LANH_DAO', 'Lãnh đạo đơn vị'),
+    ('TRUONG_DON_VI', 'Trưởng đơn vị'),
     ('DANG_UY', 'Đảng ủy'),
     ('CHI_BO', 'Chi bộ'),
     ('VIEN_CHUC', 'Viên chức'),
+    ('TCNS', 'Phòng Tổ chức Nhân sự'),
+    ('BGH', 'Ban Giám hiệu'),
     ('KE_TOAN', 'Kế toán'),
     ('HANH_CHINH', 'Hành chính');
 
@@ -527,40 +529,35 @@ CREATE TABLE YeuCauBoSung (
 -- ============================================
 
 CREATE TABLE BaoCaoSauChuyenDi (
-    ma_ho_so VARCHAR(30) PRIMARY KEY REFERENCES HoSoDiNuocNgoai(ma_ho_so) ON DELETE CASCADE,
-    ma_vien_chuc VARCHAR(20) NOT NULL REFERENCES VienChuc(ma_vien_chuc),
-
--- Nội dung báo cáo
-noi_dung TEXT NOT NULL,
-ket_qua_dat_duoc TEXT,
-chap_hanh_quy_dinh TEXT,
-tac_dong_phan_dong TEXT,
-kien_nghi TEXT,
-
--- Đánh giá
-danh_gia VARCHAR(20) CHECK (
-    danh_gia IN (
-        'TOT',
-        'KHA',
-        'TRUNG_BINH',
-        'KEM'
-    )
-),
-
--- Trạng thái
-trang_thai VARCHAR(20) NOT NULL DEFAULT 'DRAFT' CHECK (
-    trang_thai IN (
-        'DRAFT',
-        'SUBMITTED',
-        'APPROVED',
-        'REJECTED'
-    )
-),
-
--- Thời gian
-ngay_nop DATE DEFAULT CURRENT_DATE,
+    id SERIAL PRIMARY KEY,
+    ma_ho_so VARCHAR(30) UNIQUE NOT NULL REFERENCES HoSoDiNuocNgoai (ma_ho_so) ON DELETE CASCADE,
+    ma_vien_chuc VARCHAR(20) REFERENCES VienChuc (ma_vien_chuc),
+    noi_dung_bao_cao TEXT NOT NULL,
+    ket_qua_dat_duoc TEXT,
+    kien_nghi TEXT,
+    ngay_nop TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ma_trang_thai VARCHAR(20) DEFAULT 'CHO_DUYET' CHECK (
+        ma_trang_thai IN (
+            'CHO_DUYET',
+            'DA_DUYET',
+            'YEU_CAU_BO_SUNG'
+        )
+    ),
+    y_kien_phan_hoi TEXT,
+    nguoi_duyet_id INTEGER REFERENCES NguoiDung (id),
+    ngay_duyet TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE FileBaoCao (
+    id SERIAL PRIMARY KEY,
+    bao_cao_id INTEGER REFERENCES BaoCaoSauChuyenDi (id) ON DELETE CASCADE,
+    ten_file_goc VARCHAR(255) NOT NULL,
+    duong_dan VARCHAR(500) NOT NULL,
+    loai_file VARCHAR(50),
+    kich_thuoc INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ============================================
@@ -846,7 +843,6 @@ CREATE OR REPLACE FUNCTION kiem_tra_dang_vien_duyet()
 RETURNS TRIGGER AS $$
 DECLARE
     v_la_dang_vien BOOLEAN;
-    v_yeu_cau_duyet_dang BOOLEAN;
 BEGIN
     -- Kiểm tra có phải đảng viên không
     SELECT EXISTS (
@@ -855,12 +851,8 @@ BEGIN
         AND trang_thai = 'DANG_HOAT_DONG'
     ) INTO v_la_dang_vien;
     
-    -- Kiểm tra loại chuyến đi có yêu cầu duyệt đảng không
-    SELECT yeu_cau_duyet_dang INTO v_yeu_cau_duyet_dang
-    FROM LoaiChuyenDi WHERE ma_loai = NEW.ma_loai_chuyen_di;
-    
     -- Logic kiểm tra
-    IF v_la_dang_vien AND v_yeu_cau_duyet_dang AND NEW.da_duyet_dang = FALSE AND NEW.ma_trang_thai = 'DA_DUYET' THEN
+    IF v_la_dang_vien AND NEW.da_duyet_dang = FALSE AND NEW.ma_trang_thai = 'DA_DUYET' THEN
         RAISE EXCEPTION 'Đảng viên phải được duyệt đảng trước khi duyệt hồ sơ';
     END IF;
     

@@ -45,9 +45,35 @@ const updateUserRoles = async (id, roles) => {
     return await response.json();
 };
 
+const quickCreateUser = async (userData) => {
+    const response = await fetch(`${API_URL}/quick`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authService.getToken()}`
+        },
+        body: JSON.stringify(userData),
+    });
+    return await response.json();
+};
+
+const updateUserStatus = async (id, status) => {
+    const response = await fetch(`${API_URL}/${id}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authService.getToken()}`
+        },
+        body: JSON.stringify({ trang_thai: status }),
+    });
+    return await response.json();
+};
+
 export default {
     getUsers,
     createUser,
     updateUser,
-    updateUserRoles
+    updateUserRoles,
+    quickCreateUser,
+    updateUserStatus
 };

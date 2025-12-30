@@ -33,6 +33,16 @@ const updateUnit = async (id, unitData) => {
     return await response.json();
 };
 
+const deleteUnit = async (id) => {
+    const response = await fetch(`${API_URL}/${id}`, {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${authService.getToken()}`
+        },
+    });
+    return await response.json();
+};
+
 const getPartyUnits = async () => {
     const response = await fetch(`${API_URL}/party`, {
         headers: { 'Authorization': `Bearer ${authService.getToken()}` },
@@ -64,11 +74,25 @@ const updatePartyUnit = async (id, unitData) => {
     return await response.json();
 };
 
-export default {
+const deletePartyUnit = async (id) => {
+    const response = await fetch(`${API_URL}/party/${id}`, {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${authService.getToken()}`
+        },
+    });
+    return await response.json();
+};
+
+const unitService = {
     getUnits,
     createUnit,
     updateUnit,
+    deleteUnit,
     getPartyUnits,
     createPartyUnit,
-    updatePartyUnit
+    updatePartyUnit,
+    deletePartyUnit
 };
+
+export default unitService;

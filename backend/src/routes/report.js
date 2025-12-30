@@ -23,7 +23,7 @@ const upload = multer({ storage });
 
 router.post('/', protect, upload.array('files'), submitReport);
 router.get('/record/:ma_ho_so', protect, getReportByRecord);
-router.get('/pending', protect, authorize('TCNS', 'CHI_BO', 'ADMIN'), getPendingReports);
-router.put('/:id/approve', protect, authorize('TCNS', 'CHI_BO', 'ADMIN'), approveReport);
+router.get('/pending', protect, authorize('TCNS', 'CHI_BO'), getPendingReports);
+router.put('/:id/approve', protect, authorize('TCNS', 'CHI_BO'), approveReport);
 
 module.exports = router;

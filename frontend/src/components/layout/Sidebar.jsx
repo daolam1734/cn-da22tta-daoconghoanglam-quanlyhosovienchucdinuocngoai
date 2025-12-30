@@ -6,6 +6,7 @@ import {
     MdGavel,
     MdAssignment,
     MdBusiness,
+    MdList,
     MdPeople,
     MdSecurity,
     MdSettings,
@@ -18,11 +19,14 @@ const Sidebar = ({ activeView, onViewChange }) => {
     const { user, logout } = useAuth();
 
     const menuItems = [
-        { id: 'dashboard', label: 'Bảng điều khiển', icon: <MdDashboard />, roles: ['ALL'] },
+        { id: 'dashboard', label: 'Trang chủ', icon: <MdDashboard />, roles: ['ALL'] },
         { id: 'my-records', label: 'Hồ sơ của tôi', icon: <MdDescription />, roles: ['VIEN_CHUC'] },
         { id: 'process-records', label: 'Duyệt hồ sơ', icon: <MdGavel />, roles: ['TRUONG_DON_VI', 'CHI_BO', 'DANG_UY', 'TCNS', 'BGH'] },
+        { id: 'reports', label: 'Duyệt báo cáo', icon: <MdAssignment />, roles: ['TCNS', 'CHI_BO'] },
+        { id: 'all-records', label: 'Quản lý hồ sơ', icon: <MdDescription />, roles: ['ADMIN'] },
         { id: 'regulations', label: 'Quy định - Biểu mẫu', icon: <MdAssignment />, roles: ['ALL'] },
         { id: 'units', label: 'Quản lý đơn vị', icon: <MdBusiness />, roles: ['ADMIN'] },
+        { id: 'categories', label: 'Quản lý danh mục', icon: <MdList />, roles: ['ADMIN'] },
         { id: 'users', label: 'Quản lý người dùng', icon: <MdPeople />, roles: ['ADMIN'] },
         { id: 'roles', label: 'Quản lý vai trò', icon: <MdSecurity />, roles: ['ADMIN'] },
         { id: 'system-config', label: 'Cấu hình hệ thống', icon: <MdSettings />, roles: ['ADMIN'] },

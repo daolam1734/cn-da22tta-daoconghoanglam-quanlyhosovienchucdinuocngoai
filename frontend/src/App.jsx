@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ToastProvider } from './contexts/ToastContext';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import UserManagement from './pages/UserManagement';
 import RecordManagement from './pages/RecordManagement';
 import RoleManagement from './pages/RoleManagement';
 import UnitManagement from './pages/UnitManagement';
+import CategoryManagement from './pages/CategoryManagement';
 import RegulationManagement from './pages/RegulationManagement';
+import ReportManagement from './pages/ReportManagement';
 import SystemConfig from './pages/SystemConfig';
 import WorkflowManagement from './pages/WorkflowManagement';
 import Profile from './pages/Profile';
@@ -30,8 +33,11 @@ const AppContent = () => {
       case 'users': return <UserManagement />;
       case 'my-records': return <RecordManagement mode="personal" />;
       case 'process-records': return <RecordManagement mode="process" />;
+      case 'all-records': return <RecordManagement mode="all" />;
+      case 'reports': return <ReportManagement />;
       case 'roles': return <RoleManagement />;
       case 'units': return <UnitManagement />;
+      case 'categories': return <CategoryManagement />;
       case 'regulations': return <RegulationManagement />;
       case 'system-config': return <SystemConfig />;
       case 'workflows': return <WorkflowManagement />;
@@ -57,9 +63,11 @@ const AppContent = () => {
 
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ToastProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ToastProvider>
   );
 }
 

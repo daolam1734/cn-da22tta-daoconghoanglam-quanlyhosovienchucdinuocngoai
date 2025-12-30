@@ -31,8 +31,18 @@ const notifyNextProcessors = async (client, recordId, nextStatus) => {
         const { ma_don_vi, ho_ten, nguoi_tao } = recordResult.rows[0];
         let targetRoles = [];
         let targetUnit = null;
+        let targetPartyUnit = null;
+        
+        const statusNames = {
+            'CHO_DON_VI': 'Chờ đơn vị cho ý kiến',
+            'CHO_CHI_BO': 'Chờ Chi bộ xem xét',
+            'CHO_DANG_UY': 'Chờ Đảng ủy quyết định',
+            'CHO_TCNS': 'Chờ TCNS thẩm định',
+            'CHO_BGH': 'Chờ BGH phê duyệt'
+        };
+
         let title = 'Hồ sơ mới cần xử lý';
-        let content = `Có hồ sơ mới từ ${ho_ten} (${recordId}) đang chờ bạn xử lý.`;
+        let content = `Có hồ sơ mới từ ${ho_ten} (${recordId}) đang ở trạng thái: ${statusNames[nextStatus] || nextStatus}.`;
 
         switch (nextStatus) {
             case 'CHO_DON_VI':
@@ -41,6 +51,16 @@ const notifyNextProcessors = async (client, recordId, nextStatus) => {
                 break;
             case 'CHO_CHI_BO':
                 targetRoles = ['CHI_BO'];
+                // Find the specific Party Cell (Chi bo) for this unit
+                const chiBoResult = await client.query(
+                    "SELECT ma_don_vi_dang FROM DonViDang WHERE ma_don_vi = $1 AND cap_do = 'CHI_BO'",
+                    [ma_don_vi]
+                );
+                if (chiBoResult.rows.length > 0) {
+                    // We need to filter users by this ma_don_vi_dang
+                    // But NguoiDung doesn't have ma_don_vi_dang directly, it's in DangVien table
+                    targetPartyUnit = chiBoResult.rows[0].ma_don_vi_dang;
+                }
                 break;
             case 'CHO_DANG_UY':
                 targetRoles = ['DANG_UY'];
@@ -61,13 +81,19 @@ const notifyNextProcessors = async (client, recordId, nextStatus) => {
       FROM NguoiDung nd
       JOIN NguoiDungVaiTro ndvt ON nd.id = ndvt.nguoi_dung_id
       JOIN VienChuc vc ON nd.ma_vien_chuc = vc.ma_vien_chuc
+      LEFT JOIN DangVien dv ON vc.ma_vien_chuc = dv.ma_vien_chuc
       WHERE ndvt.ma_vai_tro = ANY($1) AND nd.id != $2
     `;
         let queryParams = [targetRoles, nguoi_tao];
 
         if (targetUnit) {
-            userQuery += ` AND vc.ma_don_vi = $3`;
+            userQuery += ` AND vc.ma_don_vi = $${queryParams.length + 1}`;
             queryParams.push(targetUnit);
+        }
+
+        if (targetPartyUnit) {
+            userQuery += ` AND dv.ma_don_vi_dang = $${queryParams.length + 1}`;
+            queryParams.push(targetPartyUnit);
         }
 
         const usersResult = await client.query(userQuery, queryParams);
@@ -174,16 +200,12 @@ exports.createRecord = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Tài khoản của bạn không gắn với mã viên chức. Vui lòng đăng nhập lại hoặc liên hệ quản trị viên.' });
         }
 
-        // Check if user is Dang Vien and trip requires Party approval
+        // Check if user is Dang Vien
         const dangVienResult = await client.query(
             "SELECT 1 FROM DangVien WHERE ma_vien_chuc = $1 AND trang_thai = 'DANG_HOAT_DONG'", 
             [ma_vien_chuc]
         );
-        const tripTypeResult = await client.query(
-            "SELECT yeu_cau_duyet_dang FROM LoaiChuyenDi WHERE ma_loai = $1",
-            [ma_loai_chuyen_di]
-        );
-        const requiresPartyApproval = dangVienResult.rows.length > 0 && (tripTypeResult.rows[0]?.yeu_cau_duyet_dang || false);
+        const requiresPartyApproval = dangVienResult.rows.length > 0;
 
         // Basic validation
         if (!ma_loai_chuyen_di || !ma_quoc_gia || !tu_ngay || !den_ngay || !noi_dung_cong_viec) {
@@ -297,16 +319,12 @@ exports.updateRecord = async (req, res) => {
             throw new Error('Hồ sơ đang trong quá trình xử lý, không thể chỉnh sửa');
         }
 
-        // Check if user is Dang Vien and trip requires Party approval
+        // Check if user is Dang Vien
         const dangVienResult = await client.query(
             "SELECT 1 FROM DangVien WHERE ma_vien_chuc = $1 AND trang_thai = 'DANG_HOAT_DONG'", 
             [req.user.ma_vien_chuc]
         );
-        const tripTypeResult = await client.query(
-            "SELECT yeu_cau_duyet_dang FROM LoaiChuyenDi WHERE ma_loai = $1",
-            [ma_loai_chuyen_di]
-        );
-        const requiresPartyApproval = dangVienResult.rows.length > 0 && (tripTypeResult.rows[0]?.yeu_cau_duyet_dang || false);
+        const requiresPartyApproval = dangVienResult.rows.length > 0;
 
         let status = submit_immediately === 'true' ? 'CHO_DON_VI' : record.ma_trang_thai;
         let da_duyet_dang = record.da_duyet_dang;
@@ -398,16 +416,12 @@ exports.submitRecord = async (req, res) => {
             throw new Error('Hồ sơ đã được gửi hoặc đang trong quá trình xử lý');
         }
 
-        // Check if user is Dang Vien and trip requires Party approval
+        // Check if user is Dang Vien
         const dangVienResult = await client.query(
             "SELECT 1 FROM DangVien WHERE ma_vien_chuc = $1 AND trang_thai = 'DANG_HOAT_DONG'", 
             [req.user.ma_vien_chuc]
         );
-        const tripTypeResult = await client.query(
-            "SELECT yeu_cau_duyet_dang FROM LoaiChuyenDi WHERE ma_loai = $1",
-            [record.ma_loai_chuyen_di]
-        );
-        const requiresPartyApproval = dangVienResult.rows.length > 0 && (tripTypeResult.rows[0]?.yeu_cau_duyet_dang || false);
+        const requiresPartyApproval = dangVienResult.rows.length > 0;
 
         let status = 'CHO_DON_VI';
         let da_duyet_dang = record.da_duyet_dang;
@@ -514,9 +528,10 @@ exports.withdrawRecord = async (req, res) => {
 exports.getRecords = async (req, res) => {
     try {
         let query = `
-      SELECT h.*, v.ho_ten, v.ma_don_vi as ma_don_vi_vien_chuc, l.ten_loai, q.ten_quoc_gia, t.ten_trang_thai
+      SELECT h.*, v.ho_ten, v.ma_don_vi as ma_don_vi_vien_chuc, dv.ma_don_vi_dang, l.ten_loai, q.ten_quoc_gia, t.ten_trang_thai
       FROM HoSoDiNuocNgoai h
       JOIN VienChuc v ON h.ma_vien_chuc = v.ma_vien_chuc
+      LEFT JOIN DangVien dv ON v.ma_vien_chuc = dv.ma_vien_chuc
       JOIN LoaiChuyenDi l ON h.ma_loai_chuyen_di = l.ma_loai
       JOIN QuocGia q ON h.ma_quoc_gia = q.ma_quoc_gia
       JOIN TrangThaiHoSo t ON h.ma_trang_thai = t.ma_trang_thai
@@ -526,7 +541,7 @@ exports.getRecords = async (req, res) => {
         const conditions = [];
 
         // Filter by role with strict workflow visibility
-        if (!req.user.roles.includes('ADMIN')) {
+        if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('BGH')) {
             const roleConditions = [];
 
             if (req.user.roles.includes('VIEN_CHUC')) {
@@ -540,7 +555,8 @@ exports.getRecords = async (req, res) => {
             }
 
             if (req.user.roles.includes('CHI_BO')) {
-                roleConditions.push(`h.ma_trang_thai IN ('CHO_CHI_BO', 'CHO_DANG_UY', 'CHO_TCNS', 'CHO_BGH', 'DA_DUYET', 'TU_CHOI', 'YEU_CAU_BO_SUNG')`);
+                roleConditions.push(`(h.ma_trang_thai IN ('CHO_CHI_BO', 'CHO_DANG_UY', 'CHO_TCNS', 'CHO_BGH', 'DA_DUYET', 'TU_CHOI', 'YEU_CAU_BO_SUNG') AND dv.ma_don_vi_dang = $${values.length + 1})`);
+                values.push(req.user.ma_don_vi_dang);
             }
 
             if (req.user.roles.includes('DANG_UY')) {
@@ -551,15 +567,15 @@ exports.getRecords = async (req, res) => {
                 roleConditions.push(`h.ma_trang_thai IN ('CHO_TCNS', 'CHO_BGH', 'DA_DUYET', 'TU_CHOI', 'YEU_CAU_BO_SUNG')`);
             }
 
-            if (req.user.roles.includes('BGH')) {
-                roleConditions.push(`h.ma_trang_thai IN ('CHO_BGH', 'DA_DUYET', 'TU_CHOI', 'YEU_CAU_BO_SUNG')`);
-            }
-
             if (roleConditions.length > 0) {
                 conditions.push(`(${roleConditions.join(' OR ')})`);
             } else {
                 conditions.push('1=0'); // No access if no roles
             }
+        } else if (req.user.roles.includes('BGH')) {
+            // BGH can see all records except DRAFTs of others
+            conditions.push(`(h.ma_trang_thai != 'DRAFT' OR h.ma_vien_chuc = $${values.length + 1})`);
+            values.push(req.user.ma_vien_chuc);
         }
 
         if (conditions.length > 0) {
@@ -598,7 +614,7 @@ exports.getRecordById = async (req, res) => {
         const record = recordResult.rows[0];
 
         // Security check for detail view
-        if (!req.user.roles.includes('ADMIN')) {
+        if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('BGH')) {
             let hasAccess = false;
 
             if (req.user.roles.includes('VIEN_CHUC') && record.ma_vien_chuc === req.user.ma_vien_chuc) {
@@ -632,7 +648,10 @@ exports.getRecordById = async (req, res) => {
         }
 
         const filesResult = await db.query(
-            "SELECT * FROM TaiLieuHoSo WHERE ma_ho_so = $1",
+            `SELECT t.*, l.ten_loai as ten_loai_file, l.ap_dung_cho 
+             FROM TaiLieuHoSo t 
+             LEFT JOIN LoaiTaiLieu l ON t.ma_loai = l.ma_loai 
+             WHERE t.ma_ho_so = $1`,
             [id]
         );
 
@@ -669,11 +688,10 @@ exports.processRecord = async (req, res) => {
         await client.query('BEGIN');
 
         const recordResult = await client.query(
-            `SELECT h.*, v.ma_don_vi, dv.ma_vien_chuc as dang_vien_id, dv.trang_thai as dang_vien_status, l.yeu_cau_duyet_dang 
+            `SELECT h.*, v.ma_don_vi, dv.ma_vien_chuc as dang_vien_id, dv.trang_thai as dang_vien_status
              FROM HoSoDiNuocNgoai h 
              JOIN VienChuc v ON h.ma_vien_chuc = v.ma_vien_chuc 
              LEFT JOIN DangVien dv ON v.ma_vien_chuc = dv.ma_vien_chuc 
-             JOIN LoaiChuyenDi l ON h.ma_loai_chuyen_di = l.ma_loai
              WHERE h.ma_ho_so = $1`,
             [id]
         );
@@ -699,11 +717,25 @@ exports.processRecord = async (req, res) => {
             }
         }
 
+        // Security check: Chi bo can only process records from their party unit
+        if (req.user.roles.includes('CHI_BO') && !req.user.roles.includes('ADMIN') && !req.user.roles.includes('DANG_UY')) {
+            const recordPartyUnitResult = await client.query(
+                "SELECT ma_don_vi_dang FROM DangVien WHERE ma_vien_chuc = $1",
+                [record.ma_vien_chuc]
+            );
+            const recordPartyUnit = recordPartyUnitResult.rows[0]?.ma_don_vi_dang;
+            
+            if (recordPartyUnit !== req.user.ma_don_vi_dang) {
+                await client.query('ROLLBACK');
+                return res.status(403).json({ success: false, message: 'Bạn không có quyền xử lý hồ sơ của Chi bộ khác' });
+            }
+        }
+
         const currentStatus = record.ma_trang_thai;
         let nextStatus = currentStatus;
         let da_duyet_dang = record.da_duyet_dang;
         const isDangVien = record.dang_vien_id && record.dang_vien_status === 'DANG_HOAT_DONG';
-        const requiresPartyApproval = isDangVien && record.yeu_cau_duyet_dang;
+        const requiresPartyApproval = isDangVien;
 
         if (action === 'APPROVED') {
             switch (currentStatus) {
@@ -786,12 +818,12 @@ exports.processRecord = async (req, res) => {
 
         // Create notification for owner
         const statusNames = {
-            'CHO_DON_VI': 'Chờ đơn vị duyệt',
-            'CHO_CHI_BO': 'Chờ chi bộ duyệt',
-            'CHO_DANG_UY': 'Chờ đảng ủy duyệt',
-            'CHO_TCNS': 'Chờ TCNS duyệt',
-            'CHO_BGH': 'Chờ BGH duyệt',
-            'DA_DUYET': 'Đã duyệt hoàn tất',
+            'CHO_DON_VI': 'Chờ đơn vị cho ý kiến',
+            'CHO_CHI_BO': 'Chờ Chi bộ xem xét',
+            'CHO_DANG_UY': 'Chờ Đảng ủy quyết định',
+            'CHO_TCNS': 'Chờ TCNS thẩm định',
+            'CHO_BGH': 'Chờ BGH phê duyệt',
+            'DA_DUYET': 'Đã phê duyệt hoàn tất',
             'TU_CHOI': 'Bị từ chối',
             'YEU_CAU_BO_SUNG': 'Yêu cầu bổ sung'
         };

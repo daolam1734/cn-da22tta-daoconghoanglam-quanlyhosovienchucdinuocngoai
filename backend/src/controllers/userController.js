@@ -124,9 +124,98 @@ const updateUserRoles = async (req, res) => {
     }
 };
 
+const quickCreateUser = async (req, res) => {
+    const { ho_ten, ma_don_vi, email, roles, ma_don_vi_dang, la_dang_vien, ngay_vao_dang } = req.body;
+
+    try {
+        // 1. Generate ma_vien_chuc
+        const lastUserResult = await db.query(
+            "SELECT ma_vien_chuc FROM VienChuc WHERE ma_vien_chuc LIKE 'VC%' ORDER BY ma_vien_chuc DESC LIMIT 1"
+        );
+
+        let nextNumber = 1;
+        if (lastUserResult.rows.length > 0) {
+            const lastMa = lastUserResult.rows[0].ma_vien_chuc;
+            const lastNumber = parseInt(lastMa.substring(2));
+            if (!isNaN(lastNumber)) {
+                nextNumber = lastNumber + 1;
+            }
+        }
+        const ma_vien_chuc = `VC${nextNumber.toString().padStart(5, '0')}`;
+
+        // 2. Generate default password
+        const defaultPassword = 'TVU@' + ma_vien_chuc;
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(defaultPassword, salt);
+
+        await db.query('BEGIN');
+
+        // 3. Create VienChuc
+        await db.query(
+            `INSERT INTO VienChuc (ma_vien_chuc, ho_ten, ma_don_vi, email, trang_thai) 
+             VALUES ($1, $2, $3, $4, 'DANG_LAM_VIEC')`,
+            [ma_vien_chuc, ho_ten, ma_don_vi, email]
+        );
+
+        // 4. Create DangVien if applicable
+        if (la_dang_vien) {
+            if (!ma_don_vi_dang) {
+                throw new Error('Vui lòng chọn đơn vị Đảng cho Đảng viên');
+            }
+            // Ensure ngay_vao_dang is before today to satisfy DB constraint
+            const joinDate = ngay_vao_dang ? new Date(ngay_vao_dang) : new Date();
+            if (!ngay_vao_dang) {
+                joinDate.setDate(joinDate.getDate() - 1); // Default to yesterday if not provided
+            }
+            
+            await db.query(
+                `INSERT INTO DangVien (ma_vien_chuc, ma_don_vi_dang, ngay_vao_dang, trang_thai) 
+                 VALUES ($1, $2, $3, 'DANG_HOAT_DONG')`,
+                [ma_vien_chuc, ma_don_vi_dang, joinDate]
+            );
+        }
+
+        // 5. Create NguoiDung
+        const userResult = await db.query(
+            `INSERT INTO NguoiDung (ten_dang_nhap, mat_khau_hash, email, ma_vien_chuc, trang_thai) 
+             VALUES ($1, $2, $3, $4, 'ACTIVE') RETURNING id`,
+            [ma_vien_chuc, hashedPassword, email, ma_vien_chuc]
+        );
+
+        const userId = userResult.rows[0].id;
+
+        // 6. Assign roles
+        if (roles && roles.length > 0) {
+            for (const role of roles) {
+                await db.query(
+                    'INSERT INTO NguoiDungVaiTro (nguoi_dung_id, ma_vai_tro) VALUES ($1, $2)',
+                    [userId, role]
+                );
+            }
+        }
+
+        await db.query('COMMIT');
+
+        res.status(201).json({
+            success: true,
+            message: 'Tạo người dùng thành công',
+            data: {
+                ma_vien_chuc,
+                ten_dang_nhap: ma_vien_chuc,
+                mat_khau: defaultPassword
+            }
+        });
+    } catch (error) {
+        await db.query('ROLLBACK');
+        console.error('QuickCreateUser error:', error);
+        res.status(500).json({ success: false, message: 'Lỗi hệ thống: ' + error.message });
+    }
+};
+
 module.exports = {
     getUsers,
     createUser,
     updateUser,
-    updateUserRoles
+    updateUserRoles,
+    quickCreateUser
 };

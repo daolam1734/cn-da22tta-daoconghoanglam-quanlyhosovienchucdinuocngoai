@@ -8,9 +8,10 @@ const login = async (req, res) => {
     try {
         // 1. Find user
         const userResult = await db.query(
-            `SELECT u.*, v.ho_ten, v.ma_don_vi, v.chuc_vu 
+            `SELECT u.*, v.ho_ten, v.ma_don_vi, v.chuc_vu, dv.ma_don_vi_dang
        FROM NguoiDung u 
        LEFT JOIN VienChuc v ON u.ma_vien_chuc = v.ma_vien_chuc 
+       LEFT JOIN DangVien dv ON v.ma_vien_chuc = dv.ma_vien_chuc
        WHERE u.ten_dang_nhap = $1 AND u.trang_thai = 'ACTIVE'`,
             [username]
         );
@@ -41,7 +42,8 @@ const login = async (req, res) => {
                 username: user.ten_dang_nhap,
                 roles,
                 ma_don_vi: user.ma_don_vi,
-                ma_vien_chuc: user.ma_vien_chuc
+                ma_vien_chuc: user.ma_vien_chuc,
+                ma_don_vi_dang: user.ma_don_vi_dang
             },
             process.env.JWT_SECRET,
             { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
@@ -60,6 +62,7 @@ const login = async (req, res) => {
                     fullName: user.ho_ten,
                     ma_don_vi: user.ma_don_vi,
                     ma_vien_chuc: user.ma_vien_chuc,
+                    ma_don_vi_dang: user.ma_don_vi_dang,
                     avatar_url: user.avatar_url,
                     chuc_vu: user.chuc_vu,
                     roles
@@ -81,9 +84,10 @@ const logout = async (req, res) => {
 const getMe = async (req, res) => {
     try {
         const userResult = await db.query(
-            `SELECT u.id, u.ten_dang_nhap, u.email, u.avatar_url, v.ho_ten, v.ma_don_vi, v.chuc_vu 
+            `SELECT u.id, u.ten_dang_nhap, u.email, u.avatar_url, v.ho_ten, v.ma_don_vi, v.ma_vien_chuc, v.chuc_vu, dv.ma_don_vi_dang
        FROM NguoiDung u 
        LEFT JOIN VienChuc v ON u.ma_vien_chuc = v.ma_vien_chuc 
+       LEFT JOIN DangVien dv ON v.ma_vien_chuc = dv.ma_vien_chuc
        WHERE u.id = $1`,
             [req.user.id]
         );

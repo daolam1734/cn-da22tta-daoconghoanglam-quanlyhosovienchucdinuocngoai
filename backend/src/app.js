@@ -13,6 +13,7 @@ const regulationRoutes = require('./routes/regulation');
 const reportRoutes = require('./routes/report');
 const chatRoutes = require('./routes/chat');
 const systemRoutes = require('./routes/system');
+const categoryRoutes = require('./routes/category');
 const workflowRoutes = require('./routes/workflow');
 const path = require('path');
 
@@ -40,6 +41,7 @@ app.use('/api/regulations', regulationRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/system', systemRoutes);
+app.use('/api/categories', categoryRoutes);
 app.use('/api/workflows', workflowRoutes);
 
 app.get('/health', (req, res) => {

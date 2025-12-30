@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import unitService from '../services/unitService';
-import { MdAdd, MdEdit, MdBusiness, MdClose, MdSave, MdFlag } from 'react-icons/md';
+import { MdAdd, MdEdit, MdDelete, MdBusiness, MdClose, MdSave, MdFlag } from 'react-icons/md';
 
 const UnitManagement = () => {
     const [units, setUnits] = useState([]);
@@ -119,6 +119,28 @@ const UnitManagement = () => {
         }
     };
 
+    const handleDelete = async (id) => {
+        if (!window.confirm('Bạn có chắc chắn muốn xóa mục này?')) return;
+        try {
+            let res;
+            if (activeTab === 'regular') {
+                res = await unitService.deleteUnit(id);
+            } else {
+                res = await unitService.deletePartyUnit(id);
+            }
+
+            if (res.success) {
+                alert(res.message);
+                fetchData();
+            } else {
+                alert(res.message);
+            }
+        } catch (error) {
+            console.error('Delete error:', error);
+            alert('Lỗi khi xóa dữ liệu');
+        }
+    };
+
     return (
         <div className="page-container">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
@@ -191,7 +213,8 @@ const UnitManagement = () => {
                                                 </span>
                                             </td>
                                             <td style={{ textAlign: 'right' }}>
-                                                <button className="btn btn-outline" style={{ padding: '4px 12px' }} onClick={() => handleOpenModal(unit)}>Sửa</button>
+                                                <button className="btn btn-outline" style={{ padding: '4px 12px', marginRight: '8px' }} onClick={() => handleOpenModal(unit)}>Sửa</button>
+                                                <button className="btn btn-outline" style={{ padding: '4px 12px', color: '#d93025', borderColor: '#d93025' }} onClick={() => handleDelete(unit.ma_don_vi)}>Xóa</button>
                                             </td>
                                         </tr>
                                     ))
@@ -209,7 +232,8 @@ const UnitManagement = () => {
                                                 </span>
                                             </td>
                                             <td style={{ textAlign: 'right' }}>
-                                                <button className="btn btn-outline" style={{ padding: '4px 12px' }} onClick={() => handleOpenModal(unit)}>Sửa</button>
+                                                <button className="btn btn-outline" style={{ padding: '4px 12px', marginRight: '8px' }} onClick={() => handleOpenModal(unit)}>Sửa</button>
+                                                <button className="btn btn-outline" style={{ padding: '4px 12px', color: '#d93025', borderColor: '#d93025' }} onClick={() => handleDelete(unit.ma_don_vi_dang)}>Xóa</button>
                                             </td>
                                         </tr>
                                     ))

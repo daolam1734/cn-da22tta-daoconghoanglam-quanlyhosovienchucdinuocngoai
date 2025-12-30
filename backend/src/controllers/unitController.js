@@ -40,6 +40,17 @@ exports.updateUnit = async (req, res) => {
     }
 };
 
+exports.deleteUnit = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await db.query('DELETE FROM DonVi WHERE ma_don_vi = $1', [id]);
+        res.json({ success: true, message: 'Xóa đơn vị thành công' });
+    } catch (error) {
+        console.error('Delete unit error:', error);
+        res.status(500).json({ success: false, message: 'Không thể xóa đơn vị này vì có thể đang có viên chức hoặc dữ liệu liên quan' });
+    }
+};
+
 // Don Vi Dang
 exports.getPartyUnits = async (req, res) => {
     try {
@@ -77,5 +88,16 @@ exports.updatePartyUnit = async (req, res) => {
     } catch (error) {
         console.error('Update party unit error:', error);
         res.status(500).json({ success: false, message: 'Lỗi server' });
+    }
+};
+
+exports.deletePartyUnit = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await db.query('DELETE FROM DonViDang WHERE ma_don_vi_dang = $1', [id]);
+        res.json({ success: true, message: 'Xóa đơn vị Đảng thành công' });
+    } catch (error) {
+        console.error('Delete party unit error:', error);
+        res.status(500).json({ success: false, message: 'Không thể xóa đơn vị Đảng này vì có thể đang có đảng viên hoặc dữ liệu liên quan' });
     }
 };

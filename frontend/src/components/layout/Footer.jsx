@@ -7,14 +7,14 @@ const Footer = () => {
             <div className="footer-content">
                 <div className="footer-section">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                        <img 
-                            src="/logo.png" 
-                            alt="TVU Logo" 
-                            style={{ 
-                                width: '24px', 
-                                height: '24px', 
+                        <img
+                            src="/logo.png"
+                            alt="TVU Logo"
+                            style={{
+                                width: '24px',
+                                height: '24px',
                                 objectFit: 'contain'
-                            }} 
+                            }}
                         />
                         <h3 style={{ fontSize: '0.9rem', fontWeight: '700', color: '#202124', margin: 0 }}>TRƯỜNG ĐẠI HỌC TRÀ VINH</h3>
                     </div>
@@ -28,7 +28,7 @@ const Footer = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#5f6368' }}>
                             <MdLocationOn size={16} color="#1a73e8" />
-                            <span>126 Nguyễn Thiện Thành, P.5, TP. Trà Vinh, Trà Vinh</span>
+                            <span>126 Nguyễn Thiện Thành, Phường Hòa Thuận, tỉnh Vĩnh Long</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#5f6368' }}>
                             <MdPhone size={16} color="#1a73e8" />
@@ -36,7 +36,7 @@ const Footer = () => {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#5f6368' }}>
                             <MdEmail size={16} color="#1a73e8" />
-                            <span>daihoctravinh@tvu.edu.vn</span>
+                            <span>tvu@tvu.edu.vn</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#5f6368' }}>
                             <MdLanguage size={16} color="#1a73e8" />

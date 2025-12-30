@@ -16,7 +16,8 @@ import {
     MdHistory,
     MdAttachFile,
     MdCheckCircle,
-    MdError
+    MdError,
+    MdInsertDriveFile
 } from 'react-icons/md';
 
 const RecordManagement = ({ mode = 'all' }) => {
@@ -269,13 +270,21 @@ const RecordManagement = ({ mode = 'all' }) => {
     };
 
     const canProcess = (record) => {
-        if (!record) return false;
+        if (!record || mode === 'all') return false;
         // Không cho phép tự xử lý hồ sơ của chính mình
         if (record.ma_vien_chuc === user.ma_vien_chuc) return false;
 
         const status = record.ma_trang_thai;
-        if (status === 'CHO_DON_VI' && user.roles.includes('TRUONG_DON_VI')) return true;
-        if (status === 'CHO_CHI_BO' && user.roles.includes('CHI_BO')) return true;
+        
+        // Trưởng đơn vị chỉ được duyệt hồ sơ của đơn vị mình
+        if (status === 'CHO_DON_VI' && user.roles.includes('TRUONG_DON_VI')) {
+            return record.ma_don_vi_vien_chuc === user.ma_don_vi;
+        }
+        
+        // Chi bộ chỉ được duyệt hồ sơ của Chi bộ mình
+        if (status === 'CHO_CHI_BO' && user.roles.includes('CHI_BO')) {
+            return record.ma_don_vi_dang === user.ma_don_vi_dang;
+        }
         if (status === 'CHO_DANG_UY' && user.roles.includes('DANG_UY')) return true;
         if (status === 'CHO_TCNS' && user.roles.includes('TCNS')) return true;
         if (status === 'CHO_BGH' && user.roles.includes('BGH')) return true;
@@ -312,7 +321,9 @@ const RecordManagement = ({ mode = 'all' }) => {
                         {mode === 'personal' ? 'Hồ sơ của tôi' : (mode === 'process' ? 'Duyệt hồ sơ' : 'Quản lý hồ sơ')}
                     </h1>
                     <p className="text-muted" style={{ fontSize: '0.9rem' }}>
-                        {mode === 'personal' ? 'Theo dõi và quản lý các hồ sơ bạn đã tạo' : 'Xử lý các hồ sơ đang chờ phê duyệt'}
+                        {mode === 'personal' ? 'Theo dõi và quản lý các hồ sơ bạn đã tạo' : 
+                         mode === 'process' ? 'Xử lý các hồ sơ đang chờ phê duyệt' : 
+                         'Xem danh sách tất cả hồ sơ trong hệ thống'}
                     </p>
                 </div>
                 {mode === 'personal' && user.roles.includes('VIEN_CHUC') && (
@@ -366,7 +377,7 @@ const RecordManagement = ({ mode = 'all' }) => {
                         <thead>
                             <tr>
                                 <th>Mã hồ sơ</th>
-                                {mode === 'process' && <th>Người đi</th>}
+                                {(mode === 'process' || mode === 'all') && <th>Người đi</th>}
                                 <th>Quốc gia</th>
                                 <th>Thời gian</th>
                                 <th>Nội dung</th>
@@ -378,7 +389,7 @@ const RecordManagement = ({ mode = 'all' }) => {
                             {displayRecords.map(record => (
                                 <tr key={record.ma_ho_so} onClick={() => handleViewDetail(record.ma_ho_so)} style={{ cursor: 'pointer' }}>
                                     <td><span style={{ fontWeight: '600', color: '#1a73e8' }}>{record.ma_ho_so}</span></td>
-                                    {mode === 'process' && <td>{record.ho_ten}</td>}
+                                    {(mode === 'process' || mode === 'all') && <td>{record.ho_ten}</td>}
                                     <td>{record.ten_quoc_gia}</td>
                                     <td>
                                         <div style={{ fontSize: '0.85rem' }}>
@@ -432,7 +443,7 @@ const RecordManagement = ({ mode = 'all' }) => {
                             ))}
                             {displayRecords.length === 0 && (
                                 <tr>
-                                    <td colSpan={mode === 'process' ? 7 : 6} style={{ textAlign: 'center', padding: '48px', color: '#5f6368' }}>
+                                    <td colSpan={(mode === 'process' || mode === 'all') ? 7 : 6} style={{ textAlign: 'center', padding: '48px', color: '#5f6368' }}>
                                         <MdFolderOpen style={{ fontSize: '3rem', marginBottom: '16px', color: '#dadce0' }} />
                                         <div>Không tìm thấy hồ sơ nào</div>
                                     </td>
@@ -675,7 +686,7 @@ const RecordManagement = ({ mode = 'all' }) => {
                                             )}
 
                                             {/* Approval buttons for TCNS/Chi bộ */}
-                                            {reportData.trang_thai === 'CHO_DUYET' && (user.roles.includes('TCNS') || user.roles.includes('CHI_BO')) && (
+                                            {reportData.trang_thai === 'CHO_DUYET' && mode !== 'all' && (user.roles.includes('TCNS') || user.roles.includes('CHI_BO')) && (
                                                 <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
                                                     <button className="btn btn-outline" style={{ borderColor: '#d93025', color: '#d93025', flex: 1 }} onClick={() => handleApproveReport(reportData.id, 'YEU_CAU_BO_SUNG')}>Yêu cầu bổ sung</button>
                                                     <button className="btn btn-primary" style={{ backgroundColor: '#0f9d58', flex: 1 }} onClick={() => handleApproveReport(reportData.id, 'DA_DUYET')}>Duyệt báo cáo</button>
@@ -687,18 +698,50 @@ const RecordManagement = ({ mode = 'all' }) => {
 
                                 <div>
                                     <h4 style={{ fontSize: '0.9rem', fontWeight: '700', textTransform: 'uppercase', color: '#5f6368', marginBottom: '16px', letterSpacing: '0.5px' }}>Tài liệu đính kèm</h4>
-                                    {selectedRecord.files && selectedRecord.files.length > 0 ? (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                            {selectedRecord.files.map(file => (
-                                                <div key={file.id} style={{ padding: '10px 12px', border: '1px solid #dadce0', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff' }}>
-                                                    <span style={{ fontSize: '0.85rem', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>{file.ten_file_goc}</span>
-                                                    <button onClick={() => setViewingFile(file)} className="btn btn-outline" style={{ padding: '4px 10px', fontSize: '0.75rem' }}>Xem</button>
-                                                </div>
-                                            ))}
+                                    
+                                    {/* Administrative Files */}
+                                    <div style={{ marginBottom: '20px' }}>
+                                        <div style={{ fontSize: '0.8rem', fontWeight: '600', color: '#1a73e8', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <MdInsertDriveFile /> TÀI LIỆU HÀNH CHÍNH
                                         </div>
-                                    ) : (
-                                        <p className="text-muted" style={{ fontSize: '0.85rem', fontStyle: 'italic' }}>Không có tài liệu đính kèm</p>
-                                    )}
+                                        {selectedRecord.files && selectedRecord.files.filter(f => f.ap_dung_cho !== 'DANG_VIEN').length > 0 ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                {selectedRecord.files.filter(f => f.ap_dung_cho !== 'DANG_VIEN').map(file => (
+                                                    <div key={file.id} style={{ padding: '10px 12px', border: '1px solid #dadce0', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff' }}>
+                                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                            <span style={{ fontSize: '0.85rem', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>{file.ten_file_goc}</span>
+                                                            <span style={{ fontSize: '0.7rem', color: '#5f6368' }}>{file.ten_loai_file || 'Tài liệu khác'}</span>
+                                                        </div>
+                                                        <button onClick={() => setViewingFile(file)} className="btn btn-outline" style={{ padding: '4px 10px', fontSize: '0.75rem' }}>Xem</button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-muted" style={{ fontSize: '0.8rem', fontStyle: 'italic', paddingLeft: '12px' }}>Không có tài liệu hành chính</p>
+                                        )}
+                                    </div>
+
+                                    {/* Party Files */}
+                                    <div style={{ marginBottom: '20px' }}>
+                                        <div style={{ fontSize: '0.8rem', fontWeight: '600', color: '#d93025', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <MdInsertDriveFile /> TÀI LIỆU ĐẢNG
+                                        </div>
+                                        {selectedRecord.files && selectedRecord.files.filter(f => f.ap_dung_cho === 'DANG_VIEN').length > 0 ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                {selectedRecord.files.filter(f => f.ap_dung_cho === 'DANG_VIEN').map(file => (
+                                                    <div key={file.id} style={{ padding: '10px 12px', border: '1px solid #dadce0', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff' }}>
+                                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                            <span style={{ fontSize: '0.85rem', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>{file.ten_file_goc}</span>
+                                                            <span style={{ fontSize: '0.7rem', color: '#5f6368' }}>{file.ten_loai_file || 'Tài liệu Đảng'}</span>
+                                                        </div>
+                                                        <button onClick={() => setViewingFile(file)} className="btn btn-outline" style={{ padding: '4px 10px', fontSize: '0.75rem' }}>Xem</button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-muted" style={{ fontSize: '0.8rem', fontStyle: 'italic', paddingLeft: '12px' }}>Không có tài liệu Đảng</p>
+                                        )}
+                                    </div>
 
                                     <h4 style={{ fontSize: '0.9rem', fontWeight: '700', textTransform: 'uppercase', color: '#5f6368', marginBottom: '16px', marginTop: '32px', letterSpacing: '0.5px' }}>Lịch sử xử lý</h4>
                                     {selectedRecord.logs && selectedRecord.logs.length > 0 ? (
